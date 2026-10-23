@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VEST WATCH | ระบบตรวจจับเสื้อกั๊กนิรภัย</title>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
+<style>
+:root{--bg:#0f1624;--bg2:#162033;--card:rgba(24,34,53,.82);--fg:#e8eef8;--mut:#8a9bb5;--bd:rgba(120,150,200,.2);--ac:#7c9cff;--ok:#34d399;--bad:#fb7185;--glow:rgba(124,156,255,.14);--grid:rgba(120,150,200,.04);
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f1f4fa;--bg2:#e4e9f4;--card:rgba(255,255,255,.9);--fg:#1c2438;--mut:#64708a;--bd:rgba(60,90,160,.2);--ac:#4f6df5;--ok:#059669;--bad:#e11d48;--glow:rgba(79,109,245,.12);--grid:rgba(60,90,160,.05)}}
+:root[data-theme="light"]{--bg:#f1f4fa;--bg2:#e4e9f4;--card:rgba(255,255,255,.9);--fg:#1c2438;--mut:#64708a;--bd:rgba(60,90,160,.2);--ac:#4f6df5;--ok:#059669;--bad:#e11d48;--glow:rgba(79,109,245,.12);--grid:rgba(60,90,160,.05)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+.md{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(5,10,20,.6);backdrop-filter:blur(4px)}
+.md[hidden]{display:none}
+.mc{width:100%;max-width:400px;background:var(--bg2);color:var(--fg);border:1px solid var(--bd);border-radius:16px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.md label{display:block;font-size:.85rem;color:var(--mut);margin:12px 0 4px}
+.md input,.md textarea{width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--bd);border-radius:8px;padding:8px 10px;font:inherit;resize:vertical}
+.md input:focus,.md textarea:focus{outline:2px solid var(--ac);outline-offset:1px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seg button.sel.w{background:var(--ok);color:#06251a;border-color:var(--ok)}
+.seg button.sel.b{background:var(--bad);color:#2a0710;border-color:var(--bad)}
+button.dgr{color:var(--bad);border-color:var(--bad);margin-left:auto}
+*{box-sizing:border-box}
+body{margin:0;color:var(--fg);font-family:"Sarabun",system-ui,sans-serif;line-height:1.5;min-height:100vh;
+background:radial-gradient(900px 500px at 85% -10%,var(--glow),transparent 60%),linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px),var(--bg);background-size:auto,32px 32px,32px 32px,auto}
+main{max-width:1080px;margin:0 auto;padding:18px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.logo{font-family:"Chakra Petch",sans-serif;font-weight:700;font-size:1.5rem;letter-spacing:.12em}
+.logo span{color:var(--ac)}
+.sub{color:var(--mut);font-size:.85rem}
+.clock{font-family:"Chakra Petch",monospace;text-align:right;border:1px solid var(--bd);background:var(--card);border-radius:10px;padding:6px 14px}
+.clock b{display:block;font-size:1.3rem;color:var(--ac);letter-spacing:.06em}
+.clock small{color:var(--mut)}
+.grid{display:grid;grid-template-columns:1.7fr 1fr;gap:16px}
+@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;backdrop-filter:blur(8px);box-shadow:0 0 30px var(--glow)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+button,label.b{font-family:"Chakra Petch","Sarabun",sans-serif;font-weight:600;background:linear-gradient(135deg,var(--ac),#9b7bff);color:#0b1020;border:0;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:.95rem;letter-spacing:.03em;transition:transform .15s,box-shadow .15s}
+button:hover,label.b:hover{transform:translateY(-1px);box-shadow:0 4px 18px var(--glow)}
+button:disabled{opacity:.5;cursor:wait}
+button.g{background:transparent;color:var(--fg);border:1px solid var(--bd)}
+.live{margin-left:auto;display:flex;align-items:center;gap:6px;font-family:"Chakra Petch",sans-serif;font-size:.85rem;color:var(--mut)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--mut)}
+.on .dot{background:var(--bad);animation:p 1.2s infinite}.on{color:var(--fg)}
+@keyframes p{50%{opacity:.25}}
+.screen{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--bd);background:#000}
+canvas{width:100%;display:block}
+.screen::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px)}
+.c{position:absolute;width:22px;height:22px;border:2px solid var(--ac);pointer-events:none;z-index:2}
+.c.a{top:8px;left:8px;border-right:0;border-bottom:0}.c.b{top:8px;right:8px;border-left:0;border-bottom:0}
+.c.d{bottom:8px;left:8px;border-right:0;border-top:0}.c.e{bottom:8px;right:8px;border-left:0;border-top:0}
+#msg{color:var(--bad);font-size:.9rem;min-height:1.2em;margin-bottom:6px}
+#msg.info{color:var(--mut)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.stat{border-radius:12px;padding:12px;text-align:center;border:1px solid;font-size:.9rem}
+.stat b{display:block;font-family:"Chakra Petch",sans-serif;font-size:2.4rem;line-height:1.1}
+.stat.ok{color:var(--ok);border-color:var(--ok);background:rgba(52,211,153,.1)}
+.stat.bad{color:var(--bad);border-color:var(--bad);background:rgba(251,113,133,.1)}
+h2{font-family:"Chakra Petch",sans-serif;font-size:.95rem;letter-spacing:.1em;color:var(--ac);margin:0}
+.hd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+button.sm{padding:6px 12px;font-size:.82rem}
+button.g:hover{border-color:var(--ac);color:var(--ac)}
+#log{max-height:340px;overflow:auto}
+.it{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:9px 10px;margin-bottom:6px;border-radius:8px;border-left:3px solid;background:rgba(255,255,255,.04)}
+.it.ok{border-color:var(--ok)}.it.bad{border-color:var(--bad)}
+.it b{font-family:"Chakra Petch",sans-serif}
+.it .st{font-weight:600;text-align:right}.it.ok .st{color:var(--ok)}.it.bad .st{color:var(--bad)}
+.it .tm{grid-column:1;color:var(--mut);font-size:.85rem}
+.it .ed{grid-column:2;grid-row:2;align-self:center}
+.empty{color:var(--mut);font-size:.9rem;padding:8px 0}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div><div class="logo">VEST<span>WATCH</span></div><div class="sub">ระบบตรวจจับเสื้อกั๊กนิรภัยด้วย AI (YOLO)</div></div>
+<div class="clock"><b id="ck">--:--:--</b><small id="cd">-</small></div>
+</header>
+<div class="grid">
+<div class="card">
+<div class="row">
+<button id="cam" disabled>เปิดกล้อง</button>
+<label class="b">เลือกวิดีโอ<input id="file" type="file" accept="video/*" hidden></label>
+<button class="g" id="reset">รีเซ็ต</button>
+<div class="live" id="lv"><span class="dot"></span><span id="lt">STANDBY</span></div>
+</div>
+<div id="msg" class="info">กำลังโหลดโมเดล...</div>
+<div class="screen"><i class="c a"></i><i class="c b"></i><i class="c d"></i><i class="c e"></i><canvas id="view" width="640" height="480"></canvas></div>
+</div>
+<div class="card">
+<div class="stats">
+<div class="stat ok"><b id="nok">0</b>ใส่เสื้อ</div>
+<div class="stat bad"><b id="nbad">0</b>ไม่ใส่เสื้อ</div>
+</div>
+<div class="hd"><h2>บันทึกคนที่ผ่านมา</h2><button class="g sm" id="dl">ดาวน์โหลด CSV</button></div>
+<div id="log"></div>
+</div>
+</div>
+</main>
+<div class="md" id="md" hidden><div class="mc">
+<h2>แก้ไขรายการ <span id="mid"></span></h2>
+<label for="mn">ชื่อ / รหัสพนักงาน</label><input id="mn" maxlength="40" placeholder="ไม่บังคับ">
+<label>สถานะที่ถูกต้อง</label>
+<div class="seg"><button class="g w" id="sw" type="button">ใส่เสื้อ</button><button class="g b" id="sb" type="button">ไม่ใส่เสื้อ</button></div>
+<label for="mo">หมายเหตุ</label><textarea id="mo" rows="2" maxlength="120" placeholder="เช่น ผู้เยี่ยมชม มาตรวจงานสั้นๆ"></textarea>
+<div class="row" style="margin:14px 0 0"><button id="ms">บันทึก</button><button class="g" id="mx">ยกเลิก</button><button class="g dgr" id="mdl">ลบรายการ</button></div>
+</div></div>
+<script>
+/* ================= ตั้งค่าโมเดล (แก้ตรงนี้ให้ตรงกับ best.pt ของคุณ) ================= */
+const MODEL_URL = 'best.onnx';   // ไฟล์โมเดลที่อยู่โฟลเดอร์เดียวกับ index.html
+const IMGSZ = 640;               // ขนาดภาพตอน train/export (ค่าเริ่มต้น YOLO = 640)
+const CONF = 0.40;               // ความมั่นใจขั้นต่ำ
+const IOU = 0.45;                // เกณฑ์ NMS
+// ปกติไม่ต้องแก้: ระบบอ่านชื่อ class จากไฟล์ best.onnx แล้วจับคู่ให้อัตโนมัติ
+// (ชื่อที่มีคำว่า no / without / not = ไม่ใส่เสื้อ, ชื่ออื่นที่มี vest / jacket = ใส่เสื้อ)
+// ถ้าจับคู่ผิด ให้ใส่เลข class เองที่นี่ เช่น MANUAL = {wear:[0], nowear:[1]}
+var MANUAL = null;
+// true = สลับความหมาย "ใส่เสื้อ" กับ "ไม่ใส่เสื้อ" (ใช้เมื่อโมเดลแสดงผลกลับด้าน)
+var SWAP = true;
+var CLASS_NAMES = [];
+var WEAR_CLASSES = [0];
+var NOWEAR_CLASSES = [1];
+/* ================================================================================ */
+
+const view=document.getElementById('view'),vc=view.getContext('2d');
+const pc=document.createElement('canvas');pc.width=IMGSZ;pc.height=IMGSZ;
+const px=pc.getContext('2d',{willReadFrequently:true});
+const vid=document.createElement('video');vid.muted=true;vid.playsInline=true;vid.loop=true;
+const $=id=>document.getElementById(id);
+let tracks=[],nextId=1,running=false,stream=null,session=null,busy=false,nc=0;
+const fD=new Intl.DateTimeFormat('th-TH',{day:'numeric',month:'long',year:'numeric'});
+const fT=new Intl.DateTimeFormat('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+function clock(){const n=new Date();$('ck').textContent=fT.format(n);$('cd').textContent=fD.format(n)}
+clock();setInterval(clock,1000);
+function setMsg(t,info){$('msg').textContent=t;$('msg').className=info?'info':''}
+function live(on){$('lv').className='live'+(on?' on':'');$('lt').textContent=on?'LIVE':'STANDBY'}
+function stopStream(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
+
+/* ---------- โหลดโมเดล ONNX ---------- */
+function readNames(buf){
+  const u=new Uint8Array(buf),from=Math.max(0,u.length-60000);
+  let t='';for(let i=from;i<u.length;i++)t+=String.fromCharCode(u[i]);
+  const m=t.match(/\{\s*0\s*:\s*['"][^}]*\}/);if(!m)return [];
+  const names=[],re=/(\d+)\s*:\s*(?:'([^']*)'|"([^"]*)")/g;let r;
+  while((r=re.exec(m[0])))names[+r[1]]=r[2]!==undefined?r[2]:r[3];
+  return names;
+}
+function mapClasses(){
+  if(MANUAL){WEAR_CLASSES=MANUAL.wear;NOWEAR_CLASSES=MANUAL.nowear;return}
+  const no=/^(no|non|not|without|missing)|[-_ ](no|non|not|without|missing)(\b|[-_ ])|ไม่/i;
+  const yes=/vest|jacket|safety|เสื้อ/i;
+  const w=[],n=[];
+  CLASS_NAMES.forEach((nm,i)=>{if(nm==null)return;if(no.test(nm))n.push(i);else if(yes.test(nm))w.push(i)});
+  if(w.length||n.length){WEAR_CLASSES=w;NOWEAR_CLASSES=n}
+}
+(async()=>{
+  try{
+    ort.env.wasm.numThreads=1;
+    ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/';
+    const res=await fetch(MODEL_URL);
+    if(!res.ok)throw new Error('โหลด '+MODEL_URL+' ไม่ได้ ('+res.status+')');
+    const buf=await res.arrayBuffer();
+    CLASS_NAMES=readNames(buf);mapClasses();
+    if(SWAP){const t=WEAR_CLASSES;WEAR_CLASSES=NOWEAR_CLASSES;NOWEAR_CLASSES=t}
+    session=await ort.InferenceSession.create(new Uint8Array(buf),{executionProviders:['wasm']});
+    $('cam').disabled=false;
+    const info=CLASS_NAMES.map((n,i)=>i+'='+n).join(', ')||'อ่านชื่อ class ไม่ได้ (ใช้ค่าเริ่มต้น 0=ใส่เสื้อ, 1=ไม่ใส่เสื้อ)';
+    setMsg('โหลดโมเดลสำเร็จ | class: '+info+' | ใส่เสื้อ=['+WEAR_CLASSES+'] ไม่ใส่=['+NOWEAR_CLASSES+']',true);
+  }catch(e){
+    console.error(e);
+    setMsg('โหลดโมเดลไม่สำเร็จ: '+e.message);
+  }
+})();
+
+function start(){
+  if(!session){setMsg('โมเดลยังโหลดไม่เสร็จ');return}
+  tracks=[];nextId=1;
+  vid.onloadedmetadata=()=>{view.height=Math.round(view.width*vid.videoHeight/vid.videoWidth)||480};
+  vid.play().catch(()=>{});live(true);
+  if(!running){running=true;setInterval(tick,120)}
+}
+$('cam').onclick=async()=>{
+  setMsg('');stopStream();
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+    vid.srcObject=stream;vid.loop=false;start();
+  }catch(e){setMsg('เปิดกล้องไม่ได้ (อาจไม่ได้อนุญาตหรือหน้านี้ไม่รองรับกล้อง) ลองเลือกวิดีโอแทน')}
+};
+$('file').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  setMsg('');stopStream();vid.srcObject=null;vid.loop=true;
+  vid.src=URL.createObjectURL(f);start();
+};
+$('reset').onclick=()=>{tracks=[];nextId=1};
+
+/* ---------- ตรวจจับด้วย YOLO ---------- */
+function iou(a,b){
+  const x1=Math.max(a.x1,b.x1),y1=Math.max(a.y1,b.y1),x2=Math.min(a.x2,b.x2),y2=Math.min(a.y2,b.y2);
+  const i=Math.max(0,x2-x1)*Math.max(0,y2-y1);
+  return i/((a.x2-a.x1)*(a.y2-a.y1)+(b.x2-b.x1)*(b.y2-b.y1)-i+1e-9);
+}
+function nms(boxes){
+  boxes.sort((a,b)=>b.score-a.score);
+  const keep=[];
+  for(const b of boxes){if(keep.every(k=>k.cls!==b.cls||iou(k,b)<IOU))keep.push(b)}
+  return keep;
+}
+async function detect(){
+  const vw=vid.videoWidth,vh=vid.videoHeight;
+  const sc=Math.min(IMGSZ/vw,IMGSZ/vh),nw=Math.round(vw*sc),nh=Math.round(vh*sc);
+  const padX=(IMGSZ-nw)/2,padY=(IMGSZ-nh)/2;
+  px.fillStyle='rgb(114,114,114)';px.fillRect(0,0,IMGSZ,IMGSZ);
+  px.drawImage(vid,padX,padY,nw,nh);
+  const d=px.getImageData(0,0,IMGSZ,IMGSZ).data,N=IMGSZ*IMGSZ,inp=new Float32Array(3*N);
+  for(let i=0;i<N;i++){inp[i]=d[i*4]/255;inp[N+i]=d[i*4+1]/255;inp[2*N+i]=d[i*4+2]/255}
+  const out=await session.run({[session.inputNames[0]]:new ort.Tensor('float32',inp,[1,3,IMGSZ,IMGSZ])});
+  const o=out[session.outputNames[0]],dims=o.dims,data=o.data,res=[];
+  const back=(x1,y1,x2,y2,score,cls)=>({
+    x1:Math.max(0,(x1-padX)/sc),y1:Math.max(0,(y1-padY)/sc),
+    x2:Math.min(vw,(x2-padX)/sc),y2:Math.min(vh,(y2-padY)/sc),score,cls});
+  if(dims[2]<dims[1]&&dims[2]<=7){
+    /* รูปแบบ end-to-end (เช่น YOLOv10): [1, N, 6] = x1,y1,x2,y2,score,cls */
+    for(let i=0;i<dims[1];i++){
+      const s=data[i*dims[2]+4];
+      if(s>=CONF)res.push(back(data[i*dims[2]],data[i*dims[2]+1],data[i*dims[2]+2],data[i*dims[2]+3],s,Math.round(data[i*dims[2]+5])));
+    }
+    return res;
+  }
+  /* รูปแบบ YOLOv5/v8/v11: [1, 4+nc, N] */
+  const A=dims[2];nc=dims[1]-4;
+  for(let i=0;i<A;i++){
+    let best=0,bc=0;
+    for(let c=0;c<nc;c++){const s=data[(4+c)*A+i];if(s>best){best=s;bc=c}}
+    if(best<CONF)continue;
+    const cx=data[i],cy=data[A+i],w=data[2*A+i],h=data[3*A+i];
+    res.push(back(cx-w/2,cy-h/2,cx+w/2,cy+h/2,best,bc));
+  }
+  return nms(res);
+}
+
+async function tick(){
+  if(busy||vid.readyState<2||!vid.videoWidth)return;
+  busy=true;
+  try{
+    const dets=(await detect()).filter(b=>WEAR_CLASSES.includes(b.cls)||NOWEAR_CLASSES.includes(b.cls));
+    tracks.forEach(t=>t.matched=false);
+    for(const b of dets){
+      const bx={x:b.x1,y:b.y1,w:b.x2-b.x1,h:b.y2-b.y1,score:b.score,cls:b.cls};
+      const cx=bx.x+bx.w/2,cy=bx.y+bx.h/2,lim=Math.max(bx.w,bx.h)*.8;
+      let best=null,bd=lim;
+      for(const t of tracks){
+        if(t.matched||t.gone)continue;
+        const dd=Math.hypot(t.cx-cx,t.cy-cy);
+        if(dd<bd){bd=dd;best=t}
+      }
+      if(!best){best={id:nextId++,hist:[],frames:0,missed:0,gone:false,time:new Date()};tracks.push(best)}
+      best.matched=true;best.missed=0;best.frames++;
+      best.cx=cx;best.cy=cy;best.box=bx;
+      best.hist.push(WEAR_CLASSES.includes(b.cls)?1:0);if(best.hist.length>10)best.hist.shift();
+      if(!best.manual)best.wear=best.hist.reduce((a,v)=>a+v,0)/best.hist.length>=.5;
+    }
+    for(const t of tracks){if(!t.matched&&!t.gone){t.missed++;if(t.missed>8)t.gone=true}}
+  }catch(e){console.error(e);setMsg('ตรวจจับผิดพลาด: '+e.message)}
+  busy=false;
+}
+
+let lastSig='';
+function render(){
+  if(vid.readyState>=2)vc.drawImage(vid,0,0,view.width,view.height);
+  else{vc.fillStyle='#0b111c';vc.fillRect(0,0,view.width,view.height)}
+  const sx=vid.videoWidth?view.width/vid.videoWidth:1,sy=vid.videoHeight?view.height/vid.videoHeight:1;
+  vc.lineWidth=2.5;vc.font='600 17px "Chakra Petch",sans-serif';
+  for(const t of tracks){
+    if(t.gone||t.deleted||t.missed>0||t.frames<2)continue;
+    const b=t.box,col=t.wear?'#34d399':'#fb7185';
+    const x=b.x*sx,y=b.y*sy,w=b.w*sx,h=b.h*sy,k=Math.min(18,w/3,h/3);
+    vc.strokeStyle=col;vc.shadowColor=col;vc.shadowBlur=10;
+    vc.beginPath();
+    [[x,y,1,1],[x+w,y,-1,1],[x,y+h,1,-1],[x+w,y+h,-1,-1]].forEach(([cx,cy,a,c])=>{vc.moveTo(cx+a*k,cy);vc.lineTo(cx,cy);vc.lineTo(cx,cy+c*k)});
+    vc.stroke();vc.shadowBlur=0;
+    vc.globalAlpha=.9;vc.strokeRect(x,y,w,h);vc.globalAlpha=1;
+    const txt=(t.name||'#'+t.id)+(t.wear?'  ใส่เสื้อ':'  ไม่ใส่เสื้อ')+' '+Math.round(b.score*100)+'%';
+    const tw=vc.measureText(txt).width+14,ly=Math.max(y-26,0);
+    vc.fillStyle=col;vc.fillRect(x,ly,tw,25);
+    vc.fillStyle='#04101c';vc.fillText(txt,x+7,ly+19);
+  }
+  const conf=tracks.filter(t=>t.frames>=4&&!t.deleted);
+  const sig=conf.map(t=>[t.id,t.wear?1:0,t.manual?1:0,t.name,t.note].join('~')).join('|');
+  if(sig!==lastSig){
+    lastSig=sig;
+    $('nok').textContent=conf.filter(t=>t.wear).length;
+    $('nbad').textContent=conf.filter(t=>!t.wear).length;
+    $('log').innerHTML=conf.slice().reverse().map(t=>
+      `<div class="it ${t.wear?'ok':'bad'}"><b>${t.name?esc(t.name)+' (#'+t.id+')':'คนที่ '+t.id}</b><span class="st">${t.wear?'ใส่เสื้อ':'ไม่ใส่เสื้อ'}${t.manual?' · แก้ไขแล้ว':''}</span><span class="tm">ผ่านมาเมื่อวันที่ ${fD.format(t.time)} เวลา ${fT.format(t.time)} น.</span><button class="g sm ed" data-id="${t.id}">แก้ไข</button>${t.note?`<span class="tm" style="grid-column:1/3">หมายเหตุ: ${esc(t.note)}</span>`:''}</div>`).join('')||'<div class="empty">ยังไม่พบคนเดินผ่าน</div>';
+  }
+}
+const p2=n=>String(n).padStart(2,'0');
+const dS=d=>d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+const tS=d=>p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());
+function buildCSV(){
+  const q=v=>{let s=String(v==null?'':v);if(/^[=+@-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"'};
+  const rows=[['ลำดับ','ชื่อ','วันที่','เวลา','สถานะ','หมายเหตุ']];
+  tracks.filter(t=>t.frames>=4&&!t.deleted).forEach((t,i)=>rows.push([i+1,t.name||'',dS(t.time),tS(t.time),(t.wear?'ใส่เสื้อ':'ไม่ใส่เสื้อ')+(t.manual?' (แก้ไขด้วยมือ)':''),t.note||'']));
+  return '\uFEFF'+rows.map(r=>r.map(q).join(',')).join('\r\n')+'\r\n';
+}
+$('dl').onclick=()=>{
+  if(!tracks.some(t=>t.frames>=4&&!t.deleted)){setMsg('ยังไม่มีรายการให้ดาวน์โหลด');return}
+  setMsg('');
+  const n=new Date();
+  const fn='vest-log-'+dS(n).replace(/-/g,'')+'-'+tS(n).replace(/:/g,'')+'.csv';
+  const u=URL.createObjectURL(new Blob([buildCSV()],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a');a.href=u;a.download=fn;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),1000);
+};
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let ed=null;
+function setSel(w){ed.w=w;$('sw').classList.toggle('sel',w);$('sb').classList.toggle('sel',!w)}
+function closeM(){$('md').hidden=true;ed=null;$('mdl').dataset.c='';$('mdl').textContent='ลบรายการ'}
+$('log').onclick=e=>{
+  const b=e.target.closest('.ed');if(!b)return;
+  const t=tracks.find(x=>String(x.id)===b.dataset.id);if(!t)return;
+  ed={t,w:t.wear};$('mid').textContent='#'+t.id;
+  $('mn').value=t.name||'';$('mo').value=t.note||'';setSel(t.wear);
+  $('md').hidden=false;$('mn').focus();
+};
+$('sw').onclick=()=>setSel(true);
+$('sb').onclick=()=>setSel(false);
+$('mx').onclick=closeM;
+$('md').onclick=e=>{if(e.target===$('md'))closeM()};
+$('ms').onclick=()=>{
+  if(!ed)return;const t=ed.t;
+  if(ed.w!==t.wear)t.manual=true;
+  t.wear=ed.w;t.name=$('mn').value.trim();t.note=$('mo').value.trim();closeM();
+};
+$('mdl').onclick=()=>{
+  if(!ed)return;const b=$('mdl');
+  if(!b.dataset.c){b.dataset.c='1';b.textContent='กดอีกครั้งเพื่อลบ';return}
+  ed.t.deleted=true;closeM();
+};
+(function loop(){requestAnimationFrame(loop);render()})();
+</script>
+</body>
+</html>
